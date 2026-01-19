@@ -10,7 +10,7 @@ local ConfigManager = Compkiller:ConfigManager({
 });
 
 -- Loading UI (Icon <string> , Duration <number>) --
-Compkiller:Loader("rbxassetid://98850967946168" , 2.5).yield();
+Compkiller:Loader("rbxassetid://84029282240596" , 2.5).yield();
 
 -- Creating Window --
 local Window = Compkiller.new({
