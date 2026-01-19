@@ -10,13 +10,13 @@ local ConfigManager = Compkiller:ConfigManager({
 });
 
 -- Loading UI (Icon <string> , Duration <number>) --
-Compkiller:Loader("rbxassetid://114359261902609" , 2.5).yield();
+Compkiller:Loader("rbxassetid://98850967946168" , 2.5).yield();
 
 -- Creating Window --
 local Window = Compkiller.new({
 	Name = "ZuevTemka Hub",
 	Keybind = "LeftAlt",
-	Logo = "rbxassetid://114359261902609",
+	Logo = "rbxassetid://98850967946168",
 	Scale = Compkiller.Scale.Window, -- Leave blank if you want automatic scale [PC, Mobile].
 	TextSize = 15,
 });
