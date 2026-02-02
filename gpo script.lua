@@ -1,26 +1,38 @@
 --[[
-        ZuevHub + Bandit Aimbot + Takestam 3sec + WalkSpeed 1-130 (ULTRA FAST FARM)
-        ✅ ULTRA FAST AUTO FARM (БЫСТРЕЕ чем EQUIP+SHOT!) + НОВЫЙ ОБХОД!
-]]--
+        ZuevHub + Bandit Aimbot + HIE FARM + Takestam 3sec + WalkSpeed 1-130 + ANTI-FALL SKY WALK2 (ULTRA FAST FARM)
+        ✅ ULTRA FAST AUTO FARM (RIFLE + ICE PARTISAN HEADSHOT!) + НОВЫЙ ОБХОД! + Axe Hand Logan + Fly 1s stamina!
+]]
 
 local Compkiller = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"))();
 
 -- Core Variables
 local autoShooting = false
+local hieFarming = false
 local speedEnabled = false
 local takestamEnabled = false
+local flying = false
 local showAimLine = false
 local aimLine = nil
 local currentTargetPos = nil
 local RunService = game:GetService("RunService")
-local player = game:GetService("Players").LocalPlayer
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
 local rifleMonitorConnection = nil
 local speedConnection = nil
 local takestamConnection = nil
+local flyConnection = nil
 local lastEquipTime = 0
 local EQUIP_COOLDOWN = 2
 local selectedTarget = "Bandit"
 local currentWalkSpeed = 16
+local hieCooldown = 0.9
+local flySpeed = 2
+local maxFallY = nil
+local skyWalkTimer = 0
+local SKYWALK_INTERVAL = 1.0
+local KEYS = {W=false, A=false, S=false, D=false, E=false, Q=false}
 
 -- 🔥 АВТО-ОПРЕДЕЛЕНИЕ АККАУНТА (Universal)
 local function getPlayerCharacter()
@@ -149,13 +161,15 @@ local function stopRifleMonitor()
     if rifleMonitorConnection then rifleMonitorConnection:Disconnect(); rifleMonitorConnection = nil end
 end
 
+-- Target tracking connection (ДОБАВЛЕН Axe Hand Logan!)
 local targetTracking = RunService.Heartbeat:Connect(function()
     local npcs = workspace:FindFirstChild("NPCs")
     if not npcs then currentTargetPos = nil; return end
     
     local targetModel = nil
     if selectedTarget == "Bandit" then targetModel = npcs:FindFirstChild("Bandit")
-    elseif selectedTarget == "Bandit Boss" then targetModel = npcs:FindFirstChild("Bandit Boss") end
+    elseif selectedTarget == "Bandit Boss" then targetModel = npcs:FindFirstChild("Bandit Boss")
+    elseif selectedTarget == "Axe Hand Logan" then targetModel = npcs:FindFirstChild("Axe Hand Logan") end
     
     if targetModel and targetModel:FindFirstChild("Head") then
         local humanoid = targetModel:FindFirstChild("Humanoid")
@@ -174,24 +188,26 @@ local function isTargetAlive()
     local npcs = workspace:FindFirstChild("NPCs")
     if not npcs then return false end
     
-    local targetModel = selectedTarget == "Bandit" and npcs:FindFirstChild("Bandit") or npcs:FindFirstChild("Bandit Boss")
+    local targetModel = nil
+    if selectedTarget == "Bandit" then targetModel = npcs:FindFirstChild("Bandit")
+    elseif selectedTarget == "Bandit Boss" then targetModel = npcs:FindFirstChild("Bandit Boss")
+    elseif selectedTarget == "Axe Hand Logan" then targetModel = npcs:FindFirstChild("Axe Hand Logan") end
+    
     return targetModel and targetModel:FindFirstChild("Head") and targetModel:FindFirstChild("Humanoid") and targetModel.Humanoid.Health > 0
 end
 
 local function createAimLine(fromPos, headPos)
     if aimLine then aimLine:Destroy() end
     if not headPos then return end
-    local distance = (headPos - fromPos).Magnitude
     aimLine = Instance.new("Part")
     aimLine.Name = "AimLine"; aimLine.Anchored = true; aimLine.CanCollide = false
     aimLine.Transparency = 0.3; aimLine.Color = Color3.fromRGB(255, 50, 50)
-    aimLine.Material = Enum.Material.Neon; aimLine.Size = Vector3.new(0.2, 0.2, distance)
-    local center = (fromPos + headPos) / 2
-    aimLine.CFrame = CFrame.lookAt(center, headPos) * CFrame.new(0, 0, -distance/2)
+    aimLine.Size = Vector3.new(0.1, 0.1, (headPos - fromPos).Magnitude)
+    aimLine.CFrame = CFrame.lookAt(fromPos, headPos) * CFrame.new(0, 0, -(headPos - fromPos).Magnitude/2)
     aimLine.Parent = workspace
 end
 
-function shootTargetHead()
+local function shootTargetHead()
     if not currentTargetPos or not isTargetAlive() then return false end
     local playerChar = getPlayerCharacter()
     if not playerChar or not playerChar:FindFirstChild("HumanoidRootPart") then return false end
@@ -210,7 +226,39 @@ function shootTargetHead()
     return success
 end
 
--- 🔥 ULTRA FAST AUTO FARM (БЫСТРЕЕ чем EQUIP+SHOT!)
+-- 🔥 HIE FARM FUNCTIONS (Точный aimbot как rifle!)
+local function fireHieSkill(targetPos)
+    local playerChar = getPlayerCharacter()
+    if not playerChar or not playerChar:FindFirstChild("HumanoidRootPart") then return end
+    
+    local playerPos = playerChar.HumanoidRootPart.Position
+    local startCFrame = CFrame.lookAt(playerPos + Vector3.new(0, 2, 0), targetPos)
+    
+    local args = {
+        "Ice Partisan",
+        {
+            cf = startCFrame,
+            ExploitCheck = true
+        }
+    }
+    pcall(function()
+        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Skill"):InvokeServer(unpack(args))
+    end)
+    print("🧊 Ice Partisan HEADSHOT → " .. tostring(targetPos))
+end
+
+local function hieFarmLoop()
+    while hieFarming do
+        if currentTargetPos and isTargetAlive() then
+            fireHieSkill(currentTargetPos)
+            task.wait(hieCooldown)
+        else
+            task.wait(0.05)
+        end
+    end
+end
+
+-- 🔥 ULTRA FAST AUTO FARM (RIFLE)
 local function smartAutoLoop()
     print("🚀 ULTRA FAST Auto Farm → Target: " .. selectedTarget)
     equipRifle(); task.wait(0.5); startRifleMonitor()
@@ -218,15 +266,96 @@ local function smartAutoLoop()
     while autoShooting do
         if currentTargetPos and isTargetAlive() then
             shootTargetHead()
-            task.wait(0.1)  -- ✅ 20x БЫСТРЕЕ старого!
+            task.wait(0.1)
         else
-            task.wait(0.05)  -- Мгновенный поиск цели!
+            task.wait(0.05)
         end
     end
 end
 
+-- 🔥 ANTI-FALL SKY WALK2 (Стамина каждую 1 секунду)
+local function startFly()
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local rootPart = char.HumanoidRootPart
+    local humanoid = char:FindFirstChild("Humanoid")
+    
+    flying = true
+    maxFallY = rootPart.Position.Y
+    skyWalkTimer = 0
+    
+    local bodyPos = Instance.new("BodyPosition")
+    bodyPos.MaxForce = Vector3.new(4000, math.huge, 4000)
+    bodyPos.Position = rootPart.Position
+    bodyPos.D = 3000
+    bodyPos.P = 15000
+    bodyPos.Parent = rootPart
+    
+    humanoid.PlatformStand = true
+    
+    if flyConnection then flyConnection:Disconnect() end
+    flyConnection = RunService.Heartbeat:Connect(function(dt)
+        if not flying or not rootPart.Parent then return end
+        
+        local camera = workspace.CurrentCamera
+        local moveVector = Vector3.new(0, 0, 0)
+        
+        if KEYS.W then moveVector = moveVector + camera.CFrame.LookVector end
+        if KEYS.S then moveVector = moveVector - camera.CFrame.LookVector end
+        if KEYS.A then moveVector = moveVector - camera.CFrame.RightVector end
+        if KEYS.D then moveVector = moveVector + camera.CFrame.RightVector end
+        if KEYS.E then moveVector = moveVector + Vector3.new(0, 1, 0) end
+        if KEYS.Q then moveVector = moveVector - Vector3.new(0, 1, 0) end
+        
+        if moveVector.Magnitude > 0 then
+            moveVector = moveVector.Unit * flySpeed
+        end
+        
+        local targetPos = rootPart.Position + (moveVector * dt * 80)
+        if targetPos.Y < maxFallY then
+            targetPos = Vector3.new(targetPos.X, maxFallY, targetPos.Z)
+        end
+        
+        bodyPos.Position = targetPos
+        rootPart.CFrame = CFrame.new(targetPos, targetPos + camera.CFrame.LookVector)
+        
+        skyWalkTimer = skyWalkTimer + dt
+        if skyWalkTimer >= SKYWALK_INTERVAL then
+            task.spawn(function()
+                pcall(function()
+                    local args = {
+                        "Sky Walk2",
+                        {char = char, cf = rootPart.CFrame}
+                    }
+                    ReplicatedStorage:WaitForChild("Events"):WaitForChild("Skill"):InvokeServer(unpack(args))
+                end)
+            end)
+            skyWalkTimer = 0
+        end
+    end)
+    print("🛡️ Anti-Fall Fly АКТИВЕН! Стамина каждую 1s")
+end
+
+local function stopFly()
+    flying = false
+    if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
+    
+    local char = player.Character
+    if char then
+        local humanoid = char:FindFirstChild("Humanoid")
+        local rootPart = char:FindFirstChild("HumanoidRootPart")
+        if humanoid then humanoid.PlatformStand = false end
+        if rootPart then
+            local bodyPos = rootPart:FindFirstChildOfClass("BodyPosition")
+            if bodyPos then bodyPos:Destroy() end
+        end
+    end
+    print("🛡️ Anti-Fall Fly ОСТАНОВЛЕН")
+end
+
 -- Blood Effects Blocker
-spawn(function()
+task.spawn(function()
     while true do task.wait(0.1)
         for _, gui in pairs(player.PlayerGui:GetChildren()) do
             if gui.Name:lower():find("blood") or gui.Name:lower():find("damage") then gui:Destroy() end
@@ -239,12 +368,12 @@ local Notifier = Compkiller.newNotify()
 local ConfigManager = Compkiller:ConfigManager({Directory = "ZuevHub", Config = "BanditAimbot"})
 Compkiller:Loader("rbxassetid://120245531583106", 2.5).yield()
 
-local Window = Compkiller.new({Name = "🎯 ZuevHub", Keybind = "RightAlt", Logo = "rbxassetid://120245531583106", Scale = Compkiller.Scale.Window, TextSize = 15})
+local Window = Compkiller.new({Name = "🎯 ZuevHub ULTRA", Keybind = "RightAlt", Logo = "rbxassetid://120245531583106", Scale = Compkiller.Scale.Window, TextSize = 15})
 
-Notifier.new({Title = "ZuevHub", Content = "ULTRA FAST FARM + Speed 1-130 + Takestam!", Duration = 5, Icon = "rbxassetid://120245531583106"})
+Notifier.new({Title = "ZuevHub", Content = "ULTRA FAST FARM + HIE + FLY 1s + Speed 1-130 + Takestam + Axe Hand Logan!", Duration = 5, Icon = "rbxassetid://120245531583106"})
 
 local Watermark = Window:Watermark()
-Watermark:AddText({Icon = "skull", Text = "Bandit Farmer"})
+Watermark:AddText({Icon = "skull", Text = "Bandit Farmer + Fly"})
 Watermark:AddText({Icon = "clock", Text = Compkiller:GetDate()})
 local Time = Watermark:AddText({Icon = "timer", Text = "TIME"})
 task.spawn(function() while true do task.wait(); Time:SetText(Compkiller:GetTimeNow()) end end)
@@ -253,8 +382,8 @@ task.spawn(function() while true do task.wait(); Time:SetText(Compkiller:GetTime
 Window:DrawCategory({Name = "🎯 BANDIT FARM"})
 local AimbotTab = Window:DrawTab({Name = "Bandit Aimbot", Icon = "skull", EnableScrolling = true})
 
-local TargetSection = AimbotTab:DrawSection({Name = "🎯 Выбор бандита", Position = 'left'})
-TargetSection:AddDropdown({Name = "Target", Default = "Bandit", Flag = "SelectedTarget", Values = {"Bandit", "Bandit Boss"}, Callback = function(Value)
+local TargetSection = AimbotTab:DrawSection({Name = "🎯 Выбор цели", Position = 'left'})
+TargetSection:AddDropdown({Name = "Target", Default = "Bandit", Flag = "SelectedTarget", Values = {"Bandit", "Bandit Boss", "Axe Hand Logan"}, Callback = function(Value)
     selectedTarget = Value
     Notifier.new({Title = "🎯 Цель", Content = Value, Duration = 2})
 end})
@@ -286,15 +415,48 @@ SpeedSection:AddToggle({
     end,
 })
 
+-- 🔥 FLY SECTION
+local FlySection = AimbotTab:DrawSection({Name = "🛡️ Anti-Fall Fly (1s)", Position = 'left'})
+FlySection:AddToggle({Name = "🛡️ FLY ON/OFF (WASD + E/Q)", Flag = "FlyToggle", Default = false, Callback = function(Value)
+    if Value then
+        startFly()
+        Notifier.new({Title = "🛡️ FLY ON", Content = "Стамина каждую 1s! WASD+E/Q", Duration = 3})
+    else
+        stopFly()
+        Notifier.new({Title = "⏹️ FLY OFF", Duration = 2})
+    end
+end})
+
+FlySection:AddSlider({Name = "Fly Speed", Min = 1, Max = 8, Default = 2, Color = Color3.fromRGB(100, 200, 255), Flag = "FlySpeed", Callback = function(Value)
+    flySpeed = Value
+    Notifier.new({Title = "✈️ Fly Speed", Content = Value, Duration = 1.5})
+end})
+
+-- 🔥 AUTO FARM С RIFLE + HIE HEADSHOT!
 local FarmSection = AimbotTab:DrawSection({Name = "Auto Farm", Position = 'left'})
 FarmSection:AddToggle({Name = "🧠 ULTRA FAST FARM", Flag = "BanditAuto", Default = false, Callback = function(Value)
     autoShooting = Value
     if Value then
         spawn(smartAutoLoop)
-        Notifier.new({Title = "🚀 ULTRA FAST ON", Content = "600 выстр/мин " .. selectedTarget .. "!", Duration = 4})
+        Notifier.new({Title = "🚀 RIFLE ON", Content = "600 выстр/мин HEADSHOT " .. selectedTarget .. "!", Duration = 4})
     else
         stopRifleMonitor()
-        Notifier.new({Title = "⏹️ FARM OFF", Content = "Остановлен", Duration = 2})
+        Notifier.new({Title = "⏹️ RIFLE OFF", Content = "Остановлен", Duration = 2})
+    end
+end})
+
+FFarmSection:AddSlider({Name = "🧊 HIE Delay", Min = 0.7, Max = 2, Default = 0.7, 
+    Color = Color3.fromRGB(100, 149, 237), Flag = "HieDelay", Callback = function(Value)
+    hieCooldown = Value
+end})
+
+FarmSection:AddToggle({Name = "🧊 HIE FARM", Flag = "HieAuto", Default = false, Callback = function(Value)
+    hieFarming = Value
+    if Value then
+        spawn(hieFarmLoop)
+        Notifier.new({Title = "🧊 HIE HEADSHOT ON", Content = "Ice Partisan → " .. selectedTarget, Duration = 3})
+    else
+        Notifier.new({Title = "⏹️ HIE OFF", Duration = 2})
     end
 end})
 
@@ -318,12 +480,14 @@ end})
 local InfoSection = AimbotTab:DrawSection({Name = "Info", Position = 'right'})
 local TargetLabel = InfoSection:AddParagraph({Title = "Target", Content = selectedTarget})
 local SpeedLabel = InfoSection:AddParagraph({Title = "Speed+Takestam", Content = "16 (OFF)"})
+local FlyLabel = InfoSection:AddParagraph({Title = "Fly", Content = "OFF"})
 local DistanceLabel = InfoSection:AddParagraph({Title = "Distance", Content = "⏳ Waiting..."})
 
-spawn(function()
+task.spawn(function()
     while true do task.wait(0.2)
         TargetLabel:SetContent(selectedTarget)
         SpeedLabel:SetContent(speedEnabled and (currentWalkSpeed .. " (ON)") or "16 (OFF)")
+        FlyLabel:SetContent(flying and ("ON (" .. flySpeed .. ")") or "OFF")
         if currentTargetPos and isTargetAlive() then
             local playerChar = getPlayerCharacter()
             if playerChar and playerChar:FindFirstChild("HumanoidRootPart") then
@@ -332,6 +496,17 @@ spawn(function()
             end
         else DistanceLabel:SetContent("⏳ Нет цели...") end
     end
+end)
+
+-- Клавиши для Fly
+UserInputService.InputBegan:Connect(function(input)
+    local key = input.KeyCode.Name
+    if KEYS[key] ~= nil then KEYS[key] = true end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    local key = input.KeyCode.Name
+    if KEYS[key] ~= nil then KEYS[key] = false end
 end)
 
 -- Themes
@@ -344,14 +519,18 @@ end})
 
 local ConfigUI = Window:DrawConfig({Name = "Config", Icon = "folder", Config = ConfigManager}); ConfigUI:Init()
 
--- Auto speed on spawn
+-- Auto speed + fly on spawn
 player.CharacterAdded:Connect(function()
     task.wait(1)
     if speedEnabled then 
         startSpeedBypass()
         startTakestamLoop()
     end
+    if flying then
+        task.wait(0.1)
+        startFly()
+    end
 end)
 
-print("🎯 ZuevHub ULTRA FAST FARM (600 выстр/мин) + Speed 1-130 + Takestam READY!")
-print("✅ БЫСТРЕЕ чем EQUIP+SHOT! Работает с ЛЮБЫМ аккаунтом!")
+print("🎯 ZuevHub ULTRA FAST FARM (RIFLE + HIE + FLY 1s + Axe Hand Logan!) + Speed 1-130 + Takestam READY!")
+print("✅ Rifle 600 выстр/мин + Ice Partisan 0.9с + Sky Walk2 каждую 1s + ЛЮБАЯ цель в голову!")
