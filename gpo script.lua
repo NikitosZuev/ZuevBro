@@ -1,6 +1,6 @@
 --[[
         ZuevHub + Bandit Aimbot + HIE FARM + Takestam 3sec + WalkSpeed 1-130 + ANTI-FALL SKY WALK2 (ULTRA FAST FARM)
-        ✅ ULTRA FAST AUTO FARM (RIFLE + ICE PARTISAN HEADSHOT!) + НОВЫЙ ОБХОД! + Axe Hand Logan + Fly 1s stamina!
+        ✅ ULTRA FAST AUTO FARM (RIFLE + ICE PARTISAN HEADSHOT!) + НОВЫЙ ОБХОД! + Juzo the Diamondback + Fly 1s!
 ]]
 
 local Compkiller = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"))();
@@ -27,8 +27,8 @@ local lastEquipTime = 0
 local EQUIP_COOLDOWN = 2
 local selectedTarget = "Bandit"
 local currentWalkSpeed = 16
-local hieCooldown = 0.9
-local flySpeed = 2
+local hieCooldown = 0.7 -- Фиксированный 0.7s всегда
+local flySpeed = 3
 local maxFallY = nil
 local skyWalkTimer = 0
 local SKYWALK_INTERVAL = 1.0
@@ -161,7 +161,7 @@ local function stopRifleMonitor()
     if rifleMonitorConnection then rifleMonitorConnection:Disconnect(); rifleMonitorConnection = nil end
 end
 
--- Target tracking connection (ДОБАВЛЕН Axe Hand Logan!)
+-- Target tracking connection (ВСЕ ЦЕЛИ + Juzo the Diamondback!)
 local targetTracking = RunService.Heartbeat:Connect(function()
     local npcs = workspace:FindFirstChild("NPCs")
     if not npcs then currentTargetPos = nil; return end
@@ -169,7 +169,8 @@ local targetTracking = RunService.Heartbeat:Connect(function()
     local targetModel = nil
     if selectedTarget == "Bandit" then targetModel = npcs:FindFirstChild("Bandit")
     elseif selectedTarget == "Bandit Boss" then targetModel = npcs:FindFirstChild("Bandit Boss")
-    elseif selectedTarget == "Axe Hand Logan" then targetModel = npcs:FindFirstChild("Axe Hand Logan") end
+    elseif selectedTarget == "Axe Hand Logan" then targetModel = npcs:FindFirstChild("Axe Hand Logan")
+    elseif selectedTarget == "Juzo the Diamondback" then targetModel = npcs:FindFirstChild("Juzo the Diamondback") end
     
     if targetModel and targetModel:FindFirstChild("Head") then
         local humanoid = targetModel:FindFirstChild("Humanoid")
@@ -191,7 +192,8 @@ local function isTargetAlive()
     local targetModel = nil
     if selectedTarget == "Bandit" then targetModel = npcs:FindFirstChild("Bandit")
     elseif selectedTarget == "Bandit Boss" then targetModel = npcs:FindFirstChild("Bandit Boss")
-    elseif selectedTarget == "Axe Hand Logan" then targetModel = npcs:FindFirstChild("Axe Hand Logan") end
+    elseif selectedTarget == "Axe Hand Logan" then targetModel = npcs:FindFirstChild("Axe Hand Logan")
+    elseif selectedTarget == "Juzo the Diamondback" then targetModel = npcs:FindFirstChild("Juzo the Diamondback") end
     
     return targetModel and targetModel:FindFirstChild("Head") and targetModel:FindFirstChild("Humanoid") and targetModel.Humanoid.Health > 0
 end
@@ -251,7 +253,7 @@ local function hieFarmLoop()
     while hieFarming do
         if currentTargetPos and isTargetAlive() then
             fireHieSkill(currentTargetPos)
-            task.wait(hieCooldown)
+            task.wait(hieCooldown) -- Всегда 0.7s
         else
             task.wait(0.05)
         end
@@ -370,7 +372,7 @@ Compkiller:Loader("rbxassetid://120245531583106", 2.5).yield()
 
 local Window = Compkiller.new({Name = "🎯 ZuevHub ULTRA", Keybind = "RightAlt", Logo = "rbxassetid://120245531583106", Scale = Compkiller.Scale.Window, TextSize = 15})
 
-Notifier.new({Title = "ZuevHub", Content = "ULTRA FAST FARM + HIE + FLY 1s + Speed 1-130 + Takestam + Axe Hand Logan!", Duration = 5, Icon = "rbxassetid://120245531583106"})
+Notifier.new({Title = "ZuevHub", Content = "ULTRA FAST FARM + HIE + FLY 1s + Speed 1-130 + Takestam + Juzo!", Duration = 5, Icon = "rbxassetid://120245531583106"})
 
 local Watermark = Window:Watermark()
 Watermark:AddText({Icon = "skull", Text = "Bandit Farmer + Fly"})
@@ -383,7 +385,7 @@ Window:DrawCategory({Name = "🎯 BANDIT FARM"})
 local AimbotTab = Window:DrawTab({Name = "Bandit Aimbot", Icon = "skull", EnableScrolling = true})
 
 local TargetSection = AimbotTab:DrawSection({Name = "🎯 Выбор цели", Position = 'left'})
-TargetSection:AddDropdown({Name = "Target", Default = "Bandit", Flag = "SelectedTarget", Values = {"Bandit", "Bandit Boss", "Axe Hand Logan"}, Callback = function(Value)
+TargetSection:AddDropdown({Name = "Target", Default = "Bandit", Flag = "SelectedTarget", Values = {"Bandit", "Bandit Boss", "Axe Hand Logan", "Juzo the Diamondback"}, Callback = function(Value)
     selectedTarget = Value
     Notifier.new({Title = "🎯 Цель", Content = Value, Duration = 2})
 end})
@@ -427,12 +429,12 @@ FlySection:AddToggle({Name = "🛡️ FLY ON/OFF (WASD + E/Q)", Flag = "FlyToggl
     end
 end})
 
-FlySection:AddSlider({Name = "Fly Speed", Min = 1, Max = 8, Default = 2, Color = Color3.fromRGB(100, 200, 255), Flag = "FlySpeed", Callback = function(Value)
+FlySection:AddSlider({Name = "Fly Speed", Min = 0.5, Max = 3, Default = 3, Color = Color3.fromRGB(100, 200, 255), Flag = "FlySpeed", Callback = function(Value)
     flySpeed = Value
     Notifier.new({Title = "✈️ Fly Speed", Content = Value, Duration = 1.5})
 end})
 
--- 🔥 AUTO FARM С RIFLE + HIE HEADSHOT!
+-- 🔥 AUTO FARM С RIFLE + HIE HEADSHOT! (УБРАН СЛАЙДЕР HIE DELAY)
 local FarmSection = AimbotTab:DrawSection({Name = "Auto Farm", Position = 'left'})
 FarmSection:AddToggle({Name = "🧠 ULTRA FAST FARM", Flag = "BanditAuto", Default = false, Callback = function(Value)
     autoShooting = Value
@@ -445,16 +447,11 @@ FarmSection:AddToggle({Name = "🧠 ULTRA FAST FARM", Flag = "BanditAuto", Defau
     end
 end})
 
-FFarmSection:AddSlider({Name = "🧊 HIE Delay", Min = 0.7, Max = 2, Default = 0.7, 
-    Color = Color3.fromRGB(100, 149, 237), Flag = "HieDelay", Callback = function(Value)
-    hieCooldown = Value
-end})
-
-FarmSection:AddToggle({Name = "🧊 HIE FARM", Flag = "HieAuto", Default = false, Callback = function(Value)
+FarmSection:AddToggle({Name = "🧊 HIE FARM (0.7s)", Flag = "HieAuto", Default = false, Callback = function(Value)
     hieFarming = Value
     if Value then
         spawn(hieFarmLoop)
-        Notifier.new({Title = "🧊 HIE HEADSHOT ON", Content = "Ice Partisan → " .. selectedTarget, Duration = 3})
+        Notifier.new({Title = "🧊 HIE HEADSHOT ON", Content = "Ice Partisan 0.7s → " .. selectedTarget, Duration = 3})
     else
         Notifier.new({Title = "⏹️ HIE OFF", Duration = 2})
     end
@@ -532,5 +529,5 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
-print("🎯 ZuevHub ULTRA FAST FARM (RIFLE + HIE + FLY 1s + Axe Hand Logan!) + Speed 1-130 + Takestam READY!")
-print("✅ Rifle 600 выстр/мин + Ice Partisan 0.9с + Sky Walk2 каждую 1s + ЛЮБАЯ цель в голову!")
+print("🎯 ZuevHub ULTRA FAST FARM (RIFLE + HIE + FLY 1s + Juzo!) + Speed 1-130 + Takestam READY!")
+print("✅ Rifle 600 выстр/мин + Ice Partisan 0.7с + Sky Walk2 1s + 4 ЦЕЛИ в ГОЛОВУ!")
