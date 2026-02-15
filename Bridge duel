@@ -1,16 +1,19 @@
 local aimEnabled = false
 local autoclickerEnabled = false
+local chamsEnabled = false
 local radius = 16
 local smoothness = 0.3
 local targetPart = "HumanoidRootPart"
 local currentTarget = nil
 local currentTargetPlayer = nil
+local wallCheck = true
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
+local chamsObjects = {}
 
 -- Создание GUI
 local screenGui = Instance.new("ScreenGui")
@@ -19,7 +22,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = game.CoreGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 140, 0, 70)
+frame.Size = UDim2.new(0, 140, 0, 95)
 frame.Position = UDim2.new(0, 20, 0, 20)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BackgroundTransparency = 0.2
@@ -98,6 +101,34 @@ clickText.Font = Enum.Font.Gotham
 clickText.TextXAlignment = Enum.TextXAlignment.Left
 clickText.Parent = clickStatusFrame
 
+-- Chams статус
+local chamsStatusFrame = Instance.new("Frame")
+chamsStatusFrame.Size = UDim2.new(1, 0, 0, 20)
+chamsStatusFrame.Position = UDim2.new(0, 0, 0, 70)
+chamsStatusFrame.BackgroundTransparency = 1
+chamsStatusFrame.Parent = frame
+
+local chamsDot = Instance.new("Frame")
+chamsDot.Size = UDim2.new(0, 12, 0, 12)
+chamsDot.Position = UDim2.new(0, 15, 0, 4)
+chamsDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+chamsDot.Parent = chamsStatusFrame
+
+local chamsDotCorner = Instance.new("UICorner")
+chamsDotCorner.CornerRadius = UDim.new(1, 0)
+chamsDotCorner.Parent = chamsDot
+
+local chamsText = Instance.new("TextLabel")
+chamsText.Size = UDim2.new(0, 100, 0, 20)
+chamsText.Position = UDim2.new(0, 30, 0, 0)
+chamsText.BackgroundTransparency = 1
+chamsText.Text = "CHAMS (Z): OFF"
+chamsText.TextColor3 = Color3.fromRGB(255, 100, 100)
+chamsText.TextSize = 12
+chamsText.Font = Enum.Font.Gotham
+chamsText.TextXAlignment = Enum.TextXAlignment.Left
+chamsText.Parent = chamsStatusFrame
+
 -- Функция обновления GUI
 local function updateGUI()
     if aimEnabled then
@@ -119,6 +150,136 @@ local function updateGUI()
         clickText.Text = "CLICK (M3): OFF"
         clickText.TextColor3 = Color3.fromRGB(255, 100, 100)
     end
+    
+    if chamsEnabled then
+        chamsDot.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        chamsText.Text = "CHAMS (Z): ON"
+        chamsText.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        chamsDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        chamsText.Text = "CHAMS (Z): OFF"
+        chamsText.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end
+
+-- Chams функции (синие, видны сквозь стены)
+local function applyChams(player)
+    if player == LocalPlayer then return end
+    if not player.Character then return end
+    
+    -- Очищаем старые чамсы
+    if chamsObjects[player] then
+        for _, obj in pairs(chamsObjects[player]) do
+            pcall(function() obj:Destroy() end)
+        end
+    end
+    
+    chamsObjects[player] = {}
+    
+    -- Создаем Highlight который виден сквозь стены
+    local highlight = Instance.new("Highlight")
+    highlight.Parent = player.Character
+    highlight.Adornee = player.Character
+    highlight.FillColor = Color3.fromRGB(0, 150, 255)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 0.3
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- это ключевой параметр для видимости сквозь стены
+    table.insert(chamsObjects[player], highlight)
+    
+    -- Второй слой для большей яркости
+    local highlight2 = Instance.new("Highlight")
+    highlight2.Parent = player.Character
+    highlight2.Adornee = player.Character
+    highlight2.FillColor = Color3.fromRGB(0, 100, 255)
+    highlight2.OutlineColor = Color3.fromRGB(200, 200, 255)
+    highlight2.FillTransparency = 0.5
+    highlight2.OutlineTransparency = 0.3
+    highlight2.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    table.insert(chamsObjects[player], highlight2)
+    
+    -- Добавляем BillboardGui с именем для лучшей видимости
+    local billboard = Instance.new("BillboardGui")
+    billboard.Parent = player.Character:FindFirstChild("Head") or player.Character
+    billboard.Size = UDim2.new(0, 100, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = player.Name
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextSize = 16
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextStrokeTransparency = 0.3
+    nameLabel.Parent = billboard
+    
+    table.insert(chamsObjects[player], billboard)
+end
+
+local function removeChams(player)
+    if chamsObjects[player] then
+        for _, obj in pairs(chamsObjects[player]) do
+            pcall(function() obj:Destroy() end)
+        end
+        chamsObjects[player] = nil
+    end
+end
+
+local function toggleChams()
+    chamsEnabled = not chamsEnabled
+    
+    if chamsEnabled then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                applyChams(player)
+            end
+        end
+    else
+        for _, player in pairs(Players:GetPlayers()) do
+            removeChams(player)
+        end
+    end
+    
+    updateGUI()
+end
+
+-- Отслеживание новых игроков
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        if chamsEnabled then
+            task.wait(0.5)
+            applyChams(player)
+        end
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    removeChams(player)
+end)
+
+-- Функция проверки видимости (wall check)
+local function isVisible(targetPart)
+    local character = LocalPlayer.Character
+    if not character then return false end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false end
+    
+    local camera = Camera
+    local cameraPos = camera.CFrame.Position
+    
+    -- Делаем рейкаст от камеры до цели
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = {character, targetPart.Parent}
+    
+    local direction = (targetPart.Position - cameraPos).Unit * (targetPart.Position - cameraPos).Magnitude
+    local result = workspace:Raycast(cameraPos, direction, params)
+    
+    -- Если ничего не попало в луч - значит цель видна
+    return result == nil
 end
 
 -- AIM функции
@@ -143,7 +304,17 @@ local function isTargetAlive()
     
     local distance = (rootPart.Position - targetPartObj.Position).Magnitude
     
-    return targetHumanoid.Health > 0 and distance <= radius
+    -- Проверяем радиус и жива ли цель
+    if targetHumanoid.Health > 0 and distance <= radius then
+        -- Если включен wall check, проверяем видимость
+        if wallCheck then
+            return isVisible(targetPartObj)
+        else
+            return true
+        end
+    end
+    
+    return false
 end
 
 local function findNewTarget()
@@ -166,10 +337,26 @@ local function findNewTarget()
             if targetHumanoid and targetHumanoid.Health > 0 and targetPartObj then
                 local distance = (rootPart.Position - targetPartObj.Position).Magnitude
                 
-                if distance < closestDistance then
-                    closestDistance = distance
-                    closestPlayer = player
-                    closestPos = targetPartObj.Position
+                -- Проверяем радиус
+                if distance <= radius then
+                    -- Если включен wall check, проверяем видимость
+                    if wallCheck then
+                        if isVisible(targetPartObj) then
+                            -- Если видим, ищем ближайшего
+                            if distance < closestDistance then
+                                closestDistance = distance
+                                closestPlayer = player
+                                closestPos = targetPartObj.Position
+                            end
+                        end
+                    else
+                        -- Если wall check выключен, просто берем ближайшего
+                        if distance < closestDistance then
+                            closestDistance = distance
+                            closestPlayer = player
+                            closestPos = targetPartObj.Position
+                        end
+                    end
                 end
             end
         end
@@ -268,8 +455,23 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end
         updateGUI()
     end
+    
+    -- Бинд Chams на Z
+    if input.KeyCode == Enum.KeyCode.Z then
+        toggleChams()
+    end
 end)
 
 -- Запуск
 coroutine.wrap(aimLoop)()
 updateGUI()
+
+--- Применяем чамсы к существующим игрокам при запуске (только если включено)
+task.wait(1)
+if chamsEnabled then  -- <-- добавляем проверку
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            applyChams(player)
+        end
+    end
+end
