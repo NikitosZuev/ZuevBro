@@ -1,6 +1,7 @@
 local aimEnabled = false
 local autoclickerEnabled = false
 local chamsEnabled = false
+local bedESPEnabled = false
 local radius = 16
 local smoothness = 0.3
 local targetPart = "HumanoidRootPart"
@@ -14,6 +15,7 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local chamsObjects = {}
+local bedESPObjects = {}
 
 -- Создание GUI
 local screenGui = Instance.new("ScreenGui")
@@ -22,7 +24,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = game.CoreGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 140, 0, 95)
+frame.Size = UDim2.new(0, 140, 0, 115)
 frame.Position = UDim2.new(0, 20, 0, 20)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BackgroundTransparency = 0.2
@@ -129,6 +131,34 @@ chamsText.Font = Enum.Font.Gotham
 chamsText.TextXAlignment = Enum.TextXAlignment.Left
 chamsText.Parent = chamsStatusFrame
 
+-- Bed ESP статус
+local bedStatusFrame = Instance.new("Frame")
+bedStatusFrame.Size = UDim2.new(1, 0, 0, 20)
+bedStatusFrame.Position = UDim2.new(0, 0, 0, 95)
+bedStatusFrame.BackgroundTransparency = 1
+bedStatusFrame.Parent = frame
+
+local bedDot = Instance.new("Frame")
+bedDot.Size = UDim2.new(0, 12, 0, 12)
+bedDot.Position = UDim2.new(0, 15, 0, 4)
+bedDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+bedDot.Parent = bedStatusFrame
+
+local bedDotCorner = Instance.new("UICorner")
+bedDotCorner.CornerRadius = UDim.new(1, 0)
+bedDotCorner.Parent = bedDot
+
+local bedText = Instance.new("TextLabel")
+bedText.Size = UDim2.new(0, 100, 0, 20)
+bedText.Position = UDim2.new(0, 30, 0, 0)
+bedText.BackgroundTransparency = 1
+bedText.Text = "BED ESP (B): OFF"
+bedText.TextColor3 = Color3.fromRGB(255, 100, 100)
+bedText.TextSize = 12
+bedText.Font = Enum.Font.Gotham
+bedText.TextXAlignment = Enum.TextXAlignment.Left
+bedText.Parent = bedStatusFrame
+
 -- Функция обновления GUI
 local function updateGUI()
     if aimEnabled then
@@ -160,14 +190,23 @@ local function updateGUI()
         chamsText.Text = "CHAMS (Z): OFF"
         chamsText.TextColor3 = Color3.fromRGB(255, 100, 100)
     end
+    
+    if bedESPEnabled then
+        bedDot.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        bedText.Text = "BED ESP (B): ON"
+        bedText.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        bedDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        bedText.Text = "BED ESP (B): OFF"
+        bedText.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
 end
 
--- Chams функции (синие, видны сквозь стены)
+-- Chams функции
 local function applyChams(player)
     if player == LocalPlayer then return end
     if not player.Character then return end
     
-    -- Очищаем старые чамсы
     if chamsObjects[player] then
         for _, obj in pairs(chamsObjects[player]) do
             pcall(function() obj:Destroy() end)
@@ -176,7 +215,6 @@ local function applyChams(player)
     
     chamsObjects[player] = {}
     
-    -- Создаем Highlight который виден сквозь стены
     local highlight = Instance.new("Highlight")
     highlight.Parent = player.Character
     highlight.Adornee = player.Character
@@ -184,10 +222,9 @@ local function applyChams(player)
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.FillTransparency = 0.3
     highlight.OutlineTransparency = 0
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- это ключевой параметр для видимости сквозь стены
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     table.insert(chamsObjects[player], highlight)
     
-    -- Второй слой для большей яркости
     local highlight2 = Instance.new("Highlight")
     highlight2.Parent = player.Character
     highlight2.Adornee = player.Character
@@ -198,7 +235,6 @@ local function applyChams(player)
     highlight2.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     table.insert(chamsObjects[player], highlight2)
     
-    -- Добавляем BillboardGui с именем для лучшей видимости
     local billboard = Instance.new("BillboardGui")
     billboard.Parent = player.Character:FindFirstChild("Head") or player.Character
     billboard.Size = UDim2.new(0, 100, 0, 30)
@@ -245,6 +281,117 @@ local function toggleChams()
     updateGUI()
 end
 
+-- BED ESP функции (ПРОСТО BED БЕЗ ЦВЕТОВ)
+local function findBeds()
+    local beds = {}
+    local map = workspace:FindFirstChild("Map")
+    
+    if map then
+        for _, obj in pairs(map:GetChildren()) do
+            if obj.Name == "Bed" then
+                table.insert(beds, obj)
+            end
+        end
+        
+        for _, obj in pairs(map:GetDescendants()) do
+            if obj.Name == "Bed" and obj:IsA("BasePart") then
+                if not table.find(beds, obj) then
+                    table.insert(beds, obj)
+                end
+            end
+        end
+    end
+    
+    return beds
+end
+
+local function createBedESP(bed)
+    if bedESPObjects[bed] then
+        for _, obj in pairs(bedESPObjects[bed]) do
+            pcall(function() obj:Destroy() end)
+        end
+        bedESPObjects[bed] = nil
+    end
+    
+    -- Billboard с надписью BED
+    local billboard = Instance.new("BillboardGui")
+    billboard.Parent = bed
+    billboard.Size = UDim2.new(0, 100, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Adornee = bed
+    
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    bg.BackgroundTransparency = 0.3
+    bg.Parent = billboard
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = bg
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "🛏️ BED"
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 16
+    label.Font = Enum.Font.GothamBold
+    label.Parent = bg
+    
+    -- Подсветка кровати (белая)
+    local highlight = Instance.new("Highlight")
+    highlight.Parent = bed
+    highlight.Adornee = bed
+    highlight.FillColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 0.5
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    
+    bedESPObjects[bed] = {billboard, highlight}
+end
+
+local function updateBedESP()
+    if not bedESPEnabled then return end
+    
+    local beds = findBeds()
+    
+    for _, bed in pairs(beds) do
+        if bed and bed.Parent then
+            if not bedESPObjects[bed] then
+                createBedESP(bed)
+            end
+        end
+    end
+    
+    for bedObj, _ in pairs(bedESPObjects) do
+        if not bedObj or not bedObj.Parent then
+            for _, obj in pairs(bedESPObjects[bedObj]) do
+                pcall(function() obj:Destroy() end)
+            end
+            bedESPObjects[bedObj] = nil
+        end
+    end
+end
+
+local function toggleBedESP()
+    bedESPEnabled = not bedESPEnabled
+    
+    if bedESPEnabled then
+        updateBedESP()
+    else
+        for bedObj, objects in pairs(bedESPObjects) do
+            for _, obj in pairs(objects) do
+                pcall(function() obj:Destroy() end)
+            end
+        end
+        bedESPObjects = {}
+    end
+    
+    updateGUI()
+end
+
 -- Отслеживание новых игроков
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function()
@@ -259,18 +406,14 @@ Players.PlayerRemoving:Connect(function(player)
     removeChams(player)
 end)
 
--- Функция проверки видимости (wall check)
+-- Wall check функция
 local function isVisible(targetPart)
     local character = LocalPlayer.Character
     if not character then return false end
     
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return false end
-    
     local camera = Camera
     local cameraPos = camera.CFrame.Position
     
-    -- Делаем рейкаст от камеры до цели
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Blacklist
     params.FilterDescendantsInstances = {character, targetPart.Parent}
@@ -278,7 +421,6 @@ local function isVisible(targetPart)
     local direction = (targetPart.Position - cameraPos).Unit * (targetPart.Position - cameraPos).Magnitude
     local result = workspace:Raycast(cameraPos, direction, params)
     
-    -- Если ничего не попало в луч - значит цель видна
     return result == nil
 end
 
@@ -304,9 +446,7 @@ local function isTargetAlive()
     
     local distance = (rootPart.Position - targetPartObj.Position).Magnitude
     
-    -- Проверяем радиус и жива ли цель
     if targetHumanoid.Health > 0 and distance <= radius then
-        -- Если включен wall check, проверяем видимость
         if wallCheck then
             return isVisible(targetPartObj)
         else
@@ -337,12 +477,9 @@ local function findNewTarget()
             if targetHumanoid and targetHumanoid.Health > 0 and targetPartObj then
                 local distance = (rootPart.Position - targetPartObj.Position).Magnitude
                 
-                -- Проверяем радиус
                 if distance <= radius then
-                    -- Если включен wall check, проверяем видимость
                     if wallCheck then
                         if isVisible(targetPartObj) then
-                            -- Если видим, ищем ближайшего
                             if distance < closestDistance then
                                 closestDistance = distance
                                 closestPlayer = player
@@ -350,7 +487,6 @@ local function findNewTarget()
                             end
                         end
                     else
-                        -- Если wall check выключен, просто берем ближайшего
                         if distance < closestDistance then
                             closestDistance = distance
                             closestPlayer = player
@@ -427,11 +563,20 @@ local function clickLoop()
     end
 end
 
+-- Bed ESP цикл
+local function bedESPLoop()
+    while true do
+        if bedESPEnabled then
+            updateBedESP()
+        end
+        RunService.RenderStepped:Wait()
+    end
+end
+
 -- Бинды
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
-    -- Бинд AIM на X
     if input.KeyCode == Enum.KeyCode.X then
         aimEnabled = not aimEnabled
         if aimEnabled then
@@ -447,7 +592,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         updateGUI()
     end
     
-    -- Бинд Autoclicker на MouseButton3 (колесо)
     if input.UserInputType == Enum.UserInputType.MouseButton3 then
         autoclickerEnabled = not autoclickerEnabled
         if autoclickerEnabled then
@@ -456,19 +600,22 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         updateGUI()
     end
     
-    -- Бинд Chams на Z
     if input.KeyCode == Enum.KeyCode.Z then
         toggleChams()
+    end
+    
+    if input.KeyCode == Enum.KeyCode.B then
+        toggleBedESP()
     end
 end)
 
 -- Запуск
 coroutine.wrap(aimLoop)()
+coroutine.wrap(bedESPLoop)()
 updateGUI()
 
---- Применяем чамсы к существующим игрокам при запуске (только если включено)
 task.wait(1)
-if chamsEnabled then  -- <-- добавляем проверку
+if chamsEnabled then
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             applyChams(player)
