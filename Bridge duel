@@ -1,0 +1,275 @@
+local aimEnabled = false
+local autoclickerEnabled = false
+local radius = 16
+local smoothness = 0.3
+local targetPart = "HumanoidRootPart"
+local currentTarget = nil
+local currentTargetPlayer = nil
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- Создание GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "zuev"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = game.CoreGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 140, 0, 70)
+frame.Position = UDim2.new(0, 20, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundTransparency = 0.2
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 8)
+uiCorner.Parent = frame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, 0, 0, 20)
+titleLabel.Position = UDim2.new(0, 0, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "zuev"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 14
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.Parent = frame
+
+-- Aim статус
+local aimStatusFrame = Instance.new("Frame")
+aimStatusFrame.Size = UDim2.new(1, 0, 0, 20)
+aimStatusFrame.Position = UDim2.new(0, 0, 0, 20)
+aimStatusFrame.BackgroundTransparency = 1
+aimStatusFrame.Parent = frame
+
+local aimDot = Instance.new("Frame")
+aimDot.Size = UDim2.new(0, 12, 0, 12)
+aimDot.Position = UDim2.new(0, 15, 0, 4)
+aimDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+aimDot.Parent = aimStatusFrame
+
+local aimDotCorner = Instance.new("UICorner")
+aimDotCorner.CornerRadius = UDim.new(1, 0)
+aimDotCorner.Parent = aimDot
+
+local aimText = Instance.new("TextLabel")
+aimText.Size = UDim2.new(0, 100, 0, 20)
+aimText.Position = UDim2.new(0, 30, 0, 0)
+aimText.BackgroundTransparency = 1
+aimText.Text = "AIM (X): OFF"
+aimText.TextColor3 = Color3.fromRGB(255, 100, 100)
+aimText.TextSize = 12
+aimText.Font = Enum.Font.Gotham
+aimText.TextXAlignment = Enum.TextXAlignment.Left
+aimText.Parent = aimStatusFrame
+
+-- Autoclicker статус
+local clickStatusFrame = Instance.new("Frame")
+clickStatusFrame.Size = UDim2.new(1, 0, 0, 20)
+clickStatusFrame.Position = UDim2.new(0, 0, 0, 45)
+clickStatusFrame.BackgroundTransparency = 1
+clickStatusFrame.Parent = frame
+
+local clickDot = Instance.new("Frame")
+clickDot.Size = UDim2.new(0, 12, 0, 12)
+clickDot.Position = UDim2.new(0, 15, 0, 4)
+clickDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+clickDot.Parent = clickStatusFrame
+
+local clickDotCorner = Instance.new("UICorner")
+clickDotCorner.CornerRadius = UDim.new(1, 0)
+clickDotCorner.Parent = clickDot
+
+local clickText = Instance.new("TextLabel")
+clickText.Size = UDim2.new(0, 100, 0, 20)
+clickText.Position = UDim2.new(0, 30, 0, 0)
+clickText.BackgroundTransparency = 1
+clickText.Text = "CLICK (M3): OFF"
+clickText.TextColor3 = Color3.fromRGB(255, 100, 100)
+clickText.TextSize = 12
+clickText.Font = Enum.Font.Gotham
+clickText.TextXAlignment = Enum.TextXAlignment.Left
+clickText.Parent = clickStatusFrame
+
+-- Функция обновления GUI
+local function updateGUI()
+    if aimEnabled then
+        aimDot.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        aimText.Text = "AIM (X): ON"
+        aimText.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        aimDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        aimText.Text = "AIM (X): OFF"
+        aimText.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+    
+    if autoclickerEnabled then
+        clickDot.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        clickText.Text = "CLICK (M3): ON"
+        clickText.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        clickDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        clickText.Text = "CLICK (M3): OFF"
+        clickText.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end
+
+-- AIM функции
+local function isTargetAlive()
+    if not currentTargetPlayer or not currentTargetPlayer.Character then
+        return false
+    end
+    
+    local targetChar = currentTargetPlayer.Character
+    local targetHumanoid = targetChar:FindFirstChild("Humanoid")
+    local targetPartObj = targetChar:FindFirstChild(targetPart)
+    
+    if not targetHumanoid or not targetPartObj then
+        return false
+    end
+    
+    local character = LocalPlayer.Character
+    if not character then return false end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false end
+    
+    local distance = (rootPart.Position - targetPartObj.Position).Magnitude
+    
+    return targetHumanoid.Health > 0 and distance <= radius
+end
+
+local function findNewTarget()
+    local character = LocalPlayer.Character
+    if not character then return nil, nil end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return nil, nil end
+    
+    local closestPlayer = nil
+    local closestDistance = radius + 1
+    local closestPos = nil
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local targetChar = player.Character
+            local targetHumanoid = targetChar:FindFirstChild("Humanoid")
+            local targetPartObj = targetChar:FindFirstChild(targetPart)
+            
+            if targetHumanoid and targetHumanoid.Health > 0 and targetPartObj then
+                local distance = (rootPart.Position - targetPartObj.Position).Magnitude
+                
+                if distance < closestDistance then
+                    closestDistance = distance
+                    closestPlayer = player
+                    closestPos = targetPartObj.Position
+                end
+            end
+        end
+    end
+    
+    if closestDistance <= radius then
+        return closestPlayer, closestPos
+    end
+    return nil, nil
+end
+
+local function getTargetPosition()
+    if not currentTargetPlayer or not currentTargetPlayer.Character then
+        return nil
+    end
+    
+    local targetPartObj = currentTargetPlayer.Character:FindFirstChild(targetPart)
+    if targetPartObj then
+        return targetPartObj.Position
+    end
+    return nil
+end
+
+local function aimAt(targetPos)
+    if not targetPos then return end
+    
+    local camera = Camera
+    local currentCF = camera.CFrame
+    local lookAtCF = CFrame.lookAt(currentCF.Position, targetPos)
+    
+    camera.CFrame = currentCF:Lerp(lookAtCF, smoothness)
+end
+
+local function aimLoop()
+    while true do
+        if aimEnabled then
+            if currentTargetPlayer and isTargetAlive() then
+                local targetPos = getTargetPosition()
+                if targetPos then
+                    aimAt(targetPos)
+                end
+            else
+                local newPlayer, newPos = findNewTarget()
+                if newPlayer and newPos then
+                    currentTargetPlayer = newPlayer
+                    currentTarget = newPos
+                    aimAt(newPos)
+                else
+                    currentTargetPlayer = nil
+                    currentTarget = nil
+                end
+            end
+        end
+        RunService.RenderStepped:Wait()
+    end
+end
+
+-- Autoclicker функции
+local function click()
+    mouse1click()
+end
+
+local function clickLoop()
+    while autoclickerEnabled do
+        click()
+        local randomDelay = math.random(2, 10) / 1000
+        wait(randomDelay)
+    end
+end
+
+-- Бинды
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    -- Бинд AIM на X
+    if input.KeyCode == Enum.KeyCode.X then
+        aimEnabled = not aimEnabled
+        if aimEnabled then
+            local newPlayer, newPos = findNewTarget()
+            if newPlayer and newPos then
+                currentTargetPlayer = newPlayer
+                currentTarget = newPos
+            end
+        else
+            currentTargetPlayer = nil
+            currentTarget = nil
+        end
+        updateGUI()
+    end
+    
+    -- Бинд Autoclicker на MouseButton3 (колесо)
+    if input.UserInputType == Enum.UserInputType.MouseButton3 then
+        autoclickerEnabled = not autoclickerEnabled
+        if autoclickerEnabled then
+            coroutine.wrap(clickLoop)()
+        end
+        updateGUI()
+    end
+end)
+
+-- Запуск
+coroutine.wrap(aimLoop)()
+updateGUI()
