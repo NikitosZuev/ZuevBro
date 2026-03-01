@@ -37,6 +37,7 @@ end
 
 LoadSettings()
 local WEBHOOK_URL = Settings.WebhookURL or ""
+local SendRequest = request or http_request or httprequest  -- общий HTTP [web:315]
 
 -- // СОСТОЯНИЕ ИГРЫ
 local GameState = "UNKNOWN"
@@ -135,7 +136,7 @@ pcall(ResetStats)
 local isRecording, isPlaying = false, false
 local macro, macroStartTime, macroName = {}, 0, "macro_1"
 local TowerLevels = {}
-local TowerInfo = {}  -- [towerInstance] = {name = string, pos = Vector3, level = number}
+local TowerInfo = {}  -- [towerInstance] = {name, pos, level}
 
 local function EnsureMacroFolder()
     pcall(function()
@@ -202,9 +203,8 @@ local function ShowToast(msg)
 
     frame.BackgroundTransparency = 1
     label.TextTransparency = 1
-    local ti = TweenService:Create(frame, TweenInfo.new(0.2), {BackgroundTransparency = 0.15})
-    local ti2 = TweenService:Create(label, TweenInfo.new(0.2), {TextTransparency = 0})
-    ti:Play(); ti2:Play()
+    TweenService:Create(frame, TweenInfo.new(0.2), {BackgroundTransparency = 0.15}):Play()
+    TweenService:Create(label, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
 
     task.delay(2.5, function()
         local o1 = TweenService:Create(frame, TweenInfo.new(0.2), {BackgroundTransparency = 1})
@@ -355,7 +355,6 @@ macroNameBox.FocusLost:Connect(function()
     end
 end)
 
--- Select macro теперь КНОПКА
 local selectMacroBtn = Instance.new("TextButton", bottomBar)
 selectMacroBtn.Size = UDim2.new(0.32,0,1,0)
 selectMacroBtn.Position = UDim2.new(0.34,0,0,0)
@@ -686,6 +685,7 @@ local function LoadMacro(name)
     return result
 end
 
+-- // ПРОСТОЙ WEBHOOK (для Game Left / fallback)
 local function SendWebhook(title, description, color)
     if WEBHOOK_URL == "" then return end
     pcall(function()
@@ -696,7 +696,7 @@ local function SendWebhook(title, description, color)
                 color = color or 5763719
             }}
         }
-        (request or http_request or httprequest)({
+        SendRequest({
             Url = WEBHOOK_URL,
             Method = "POST",
             Headers = {["Content-Type"] = "application/json"},
@@ -705,7 +705,7 @@ local function SendWebhook(title, description, color)
     end)
 end
 
--- // ХУК __namecall (РЕКОРД)
+-- // ХУК __namecall (РЕКОРД) — та же логика place/upgrade/sell/ability с кэшем уровня
 local mt = getrawmetatable(game)
 local old = mt.__namecall
 setreadonly(mt,false)
@@ -1162,5 +1162,252 @@ UserInputService.InputBegan:Connect(function(input,gp)
     end
 end)
 
+-- // ДЕТАЛЬНЫЙ WEBHOOK ПО ЭКРАНУ НАГРАД
+
+local ItemNames = {
+    ["17447507910"] = "Timescale Ticket(s)",
+    ["17438486690"] = "Range Flag(s)",
+    ["17438486138"] = "Damage Flag(s)",
+    ["17438487774"] = "Cooldown Flag(s)",
+    ["17429537022"] = "Blizzard(s)",
+    ["17448596749"] = "Napalm Strike(s)",
+    ["18493073533"] = "Spin Ticket(s)",
+    ["17429548305"] = "Supply Drop(s)",
+    ["18443277308"] = "Low Grade Consumable Crate(s)",
+    ["136180382135048"] = "Santa Radio(s)",
+    ["18443277106"] = "Mid Grade Consumable Crate(s)",
+    ["18443277591"] = "High Grade Consumable Crate(s)",
+    ["132155797622156"] = "Christmas Tree(s)",
+    ["124065875200929"] = "Fruit Cake(s)",
+    ["17429541513"] = "Barricade(s)",
+    ["110415073436604"] = "Holy Hand Grenade(s)",
+    ["17429533728"] = "Frag Grenade(s)",
+    ["17437703262"] = "Molotov(s)",
+    ["139414922355803"] = "Present Clusters(s)"
+}
+
+local function GetAllRewards()
+    local results = {
+        Coins = 0,
+        Gems = 0,
+        XP = 0,
+        Wave = 0,
+        Time = "00:00",
+        Status = "UNKNOWN",
+        Others = {}
+    }
+
+    local UiRoot = playerGui:FindFirstChild("ReactGameNewRewards")
+    if not UiRoot or not UiRoot.Enabled then return results end
+
+    local MainFrame = UiRoot:FindFirstChild("Frame")
+    if not MainFrame then return results end
+
+    local GameOver = MainFrame:FindFirstChild("gameOver")
+    if not GameOver or not GameOver.Visible then return results end
+
+    local RewardsScreen = GameOver:FindFirstChild("RewardsScreen")
+    if not RewardsScreen then return results end
+
+    local GameStats = RewardsScreen:FindFirstChild("gameStats")
+    local StatsList = GameStats and GameStats:FindFirstChild("stats")
+
+    if StatsList then
+        for _, frame in ipairs(StatsList:GetChildren()) do
+            local l1 = frame:FindFirstChild("textLabel")
+            local l2 = frame:FindFirstChild("textLabel2")
+            if l1 and l2 and l1.Text:find("Time Completed:") then
+                results.Time = l2.Text
+                break
+            end
+        end
+    end
+
+    local TopBanner = RewardsScreen:FindFirstChild("RewardBanner")
+    if TopBanner and TopBanner:FindFirstChild("textLabel") then
+        local txt = TopBanner.textLabel.Text:upper()
+        results.Status = txt:find("TRIUMPH") and "WIN" or (txt:find("LOST") and "LOSS" or "UNKNOWN")
+    end
+
+    local label = playerGui:FindFirstChild("ReactGameTopGameDisplay")
+        and playerGui.ReactGameTopGameDisplay:FindFirstChild("Frame")
+        and playerGui.ReactGameTopGameDisplay.Frame:FindFirstChild("wave")
+        and playerGui.ReactGameTopGameDisplay.Frame.wave:FindFirstChild("container")
+        and playerGui.ReactGameTopGameDisplay.Frame.wave.container:FindFirstChild("value")
+
+    if label then
+        local WaveNum = label.Text:match("^(%d+)")
+        if WaveNum then
+            results.Wave = tonumber(WaveNum) or 0
+        end
+    end
+
+    local SectionRewards = RewardsScreen:FindFirstChild("RewardsSection")
+    if SectionRewards then
+        for _, item in ipairs(SectionRewards:GetChildren()) do
+            if tonumber(item.Name) then
+                local IconId = "0"
+                local img = item:FindFirstChildWhichIsA("ImageLabel", true)
+                if img then
+                    IconId = img.Image:match("%d+") or "0"
+                end
+
+                for _, child in ipairs(item:GetDescendants()) do
+                    if child:IsA("TextLabel") then
+                        local text = child.Text
+                        local amt = tonumber(text:match("(%d+)")) or 0
+
+                        if text:find("Coins") then
+                            results.Coins = amt
+                        elseif text:find("Gems") then
+                            results.Gems = amt
+                        elseif text:find("XP") then
+                            results.XP = amt
+                        elseif text:lower():find("x%d+") then
+                            local displayName = ItemNames[IconId] or "Unknown Item (" .. IconId .. ")"
+                            table.insert(results.Others, {Amount = text:match("x%d+"), Name = displayName})
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return results
+end
+
+local function SendDetailedWebhook(match)
+    if WEBHOOK_URL == "" then return end
+
+    Stats.TotalCoins = Stats.TotalCoins + match.Coins
+    Stats.TotalGems = Stats.TotalGems + match.Gems
+
+    local bonusLines = {}
+    if #match.Others > 0 then
+        for _, res in ipairs(match.Others) do
+            table.insert(bonusLines, string.format("🎁 **%s %s**", res.Amount, res.Name))
+        end
+    end
+    local BonusString = (#bonusLines > 0) and table.concat(bonusLines, "\n") or "_No bonus rewards found._"
+
+    local PostData = {
+        username = "Zuev Hub TDS",
+        embeds = {{
+            title = (match.Status == "WIN" and "🏆 TRIUMPH" or "💀 DEFEAT"),
+            color = (match.Status == "WIN" and 0x2ecc71 or 0xe74c3c),
+            description = string.format(
+                "### 📋 Match Overview\n> **Status:** `%s`\n> **Time:** `%s`\n> **Wave:** `%s`",
+                match.Status,
+                match.Time,
+                tostring(match.Wave)
+            ),
+            fields = {
+                {
+                    name = "✨ Rewards",
+                    value = string.format(
+                        "```ansi\nCoins: +%d\nGems:  +%d\nXP:    +%d```",
+                        match.Coins,
+                        match.Gems,
+                        match.XP
+                    ),
+                    inline = false
+                },
+                {
+                    name = "🎁 Bonus Items",
+                    value = BonusString,
+                    inline = true
+                },
+                {
+                    name = "📊 Session Totals",
+                    value = string.format(
+                        "```py\nCoins: %d\nGems:  %d```",
+                        Stats.TotalCoins,
+                        Stats.TotalGems
+                    ),
+                    inline = true
+                }
+            },
+            footer = { text = "Logged for " .. player.Name .. " • Zuev Hub" },
+            timestamp = DateTime.now():ToIsoDate()
+        }}
+    }
+
+    pcall(function()
+        SendRequest({
+            Url = WEBHOOK_URL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(PostData)
+        })
+        print("[SYSTEM] Game stats sent to webhook")
+    end)
+end
+
+
+local lastGameState = GameState
+local gameEndProcessed = false
+
+local function CheckGameEnd()
+    UpdateGameState()
+
+    if GameState == "REWARDS" and not gameEndProcessed then
+        print("[DEBUG] Game ended! Rewards screen detected")
+        gameEndProcessed = true
+
+        task.wait(1)
+
+        local match = GetAllRewards()
+
+        if match and (match.Coins > 0 or match.Gems > 0 or match.XP > 0) then
+            print("[DEBUG] Found rewards - Coins: "..match.Coins..", Gems: "..match.Gems)
+            SendDetailedWebhook(match)
+        else
+            print("[DEBUG] No rewards found in screen, using stats")
+            UpdateStats()
+            if WEBHOOK_URL ~= "" and (Stats.EarnedCoins > 0 or Stats.EarnedGems > 0) then
+                local description = string.format(
+                    "+%d coins (Total: %d)\\n+%d gems (Total: %d)",
+                    Stats.EarnedCoins, Stats.Coins,
+                    Stats.EarnedGems, Stats.Gems
+                )
+                SendWebhook("📊 Game Finished", description, 5763719)
+            end
+        end
+    end
+
+    if GameState == "LOBBY" and lastGameState == "REWARDS" then
+        ResetStats()
+        gameEndProcessed = false
+        print("[DEBUG] Returned to lobby, stats reset")
+    end
+
+    if GameState == "LOBBY" and lastGameState ~= "LOBBY" then
+        gameEndProcessed = false
+    end
+
+    lastGameState = GameState
+end
+
+task.spawn(function()
+    print("[SYSTEM] Game end detector started")
+    while true do
+        pcall(CheckGameEnd)
+        task.wait(0.5)
+    end
+end)
+
+player.OnTeleport:Connect(function()
+    UpdateStats()
+    if WEBHOOK_URL ~= "" and (Stats.EarnedCoins > 0 or Stats.EarnedGems > 0) and not gameEndProcessed then
+        local description = string.format(
+            "+%d coins (Total: %d)\\n+%d gems (Total: %d)",
+            Stats.EarnedCoins, Stats.Coins,
+            Stats.EarnedGems, Stats.Gems
+        )
+        SendWebhook("📊 Game Left", description, 5763719)
+    end
+end)
+
 UpdateGameState()
 ResetStats()
+print("[SYSTEM] Macro + webhook loaded")
