@@ -37,7 +37,7 @@ end
 
 LoadSettings()
 local WEBHOOK_URL = Settings.WebhookURL or ""
-local SendRequest = request or http_request or httprequest  -- общий HTTP [web:315]
+local SendRequest = request or http_request or httprequest
 
 -- // СОСТОЯНИЕ ИГРЫ
 local GameState = "UNKNOWN"
@@ -403,6 +403,16 @@ local LOG_COLORS = {
 local function AddLog(text, kind)
     kind = kind or "system"
     local color = LOG_COLORS[kind] or Color3.fromRGB(200,200,220)
+
+    local tag
+    if isRecording then
+        tag = "[RECORD]"
+    elseif isPlaying then
+        tag = "[PLAY]"
+    else
+        tag = "[SYSTEM]"
+    end
+
     local line = Instance.new("TextLabel")
     line.Size = UDim2.new(1,-4,0,16)
     line.BackgroundTransparency = 1
@@ -410,11 +420,17 @@ local function AddLog(text, kind)
     line.TextSize = 13
     line.TextXAlignment = Enum.TextXAlignment.Left
     line.TextColor3 = color
+
     local timeStr = os.date("%H:%M:%S")
-    line.Text = "["..timeStr.."] "..text
+    line.Text = string.format("[%s] %s %s", timeStr, tag, text)
+
     line.Parent = logScroll
     logScroll.CanvasSize = UDim2.new(0,0,0,logLayout.AbsoluteContentSize.Y + 4)
-    logScroll.CanvasPosition = Vector2.new(0, math.max(0, logScroll.CanvasSize.Y.Offset - logScroll.AbsoluteWindowSize.Y))
+    logScroll.CanvasPosition = Vector2.new(
+        0,
+        math.max(0, logScroll.CanvasSize.Y.Offset - logScroll.AbsoluteWindowSize.Y)
+    )
+
     print("[TDS-LOG]", line.Text)
 end
 
@@ -452,7 +468,7 @@ local function RefreshMacroList()
             btn.MouseButton1Click:Connect(function()
                 selectMacroBtn.Text = name
                 macroListFrame.Visible = false
-                AddLog("[SYSTEM] selected: "..name, "system")
+                AddLog("selected: "..name, "system")
                 ShowToast("Selected: "..name)
             end)
         end
@@ -504,7 +520,7 @@ end
 
 local function SaveCurrentMacroSafe()
     if #macro == 0 then
-        AddLog("[WARNING] no actions to save", "warn")
+        AddLog("no actions to save", "warn")
         ShowToast("No actions to save")
         return
     end
@@ -515,7 +531,7 @@ local function SaveCurrentMacroSafe()
     EnsureMacroFolder()
     local fileName = "Zuev Hub/"..macroName..".json"
     if isfile(fileName) then
-        AddLog("[WARNING] macro already exists: "..macroName, "warn")
+        AddLog("macro already exists: "..macroName, "warn")
         ShowToast("Macro already exists")
         return
     end
@@ -523,11 +539,11 @@ local function SaveCurrentMacroSafe()
         writefile(fileName, HttpService:JSONEncode(macro))
     end)
     if ok then
-        AddLog("[SUCCESS] macro saved: "..fileName, "success")
+        AddLog("macro saved: "..fileName, "success")
         ShowToast("Saved: "..macroName)
         selectMacroBtn.Text = macroName
     else
-        AddLog("[ERROR] failed to save macro: "..tostring(err), "error")
+        AddLog("failed to save macro: "..tostring(err), "error")
         ShowToast("Save error, see F9")
     end
 end
@@ -558,12 +574,12 @@ end)
 stopBtn.MouseButton1Click:Connect(function()
     if isRecording then
         isRecording = false
-        AddLog("[SYSTEM] macro recording stopped ("..#macro.." actions)", "system")
+        AddLog("macro recording stopped ("..#macro.." actions)", "system")
         ShowToast("Recording stopped ("..#macro.." actions)")
         SaveCurrentMacroSafe()
     elseif isPlaying then
         isPlaying = false
-        AddLog("[SYSTEM] macro play stopped", "system")
+        AddLog("macro play stopped", "system")
         ShowToast("Playback stopped")
     end
 end)
@@ -685,7 +701,7 @@ local function LoadMacro(name)
     return result
 end
 
--- // ПРОСТОЙ WEBHOOK (для Game Left / fallback)
+-- ПРОСТОЙ WEBHOOK
 local function SendWebhook(title, description, color)
     if WEBHOOK_URL == "" then return end
     pcall(function()
@@ -705,7 +721,7 @@ local function SendWebhook(title, description, color)
     end)
 end
 
--- // ХУК __namecall (РЕКОРД) — та же логика place/upgrade/sell/ability с кэшем уровня
+-- ХУК __namecall (РЕКОРД)
 local mt = getrawmetatable(game)
 local old = mt.__namecall
 setreadonly(mt,false)
@@ -740,11 +756,7 @@ mt.__namecall = function(self,...)
                     local pivot = tower:GetPivot()
                     local tpos = pivot and pivot.Position or pos
 
-                    TowerInfo[tower] = {
-                        name  = towerName,
-                        pos   = tpos,
-                        level = 0
-                    }
+                    TowerInfo[tower] = {name = towerName, pos = tpos, level = 0}
 
                     AddAction({
                         type = "place",
@@ -787,11 +799,7 @@ mt.__namecall = function(self,...)
                         end
                         local newLevel = oldLevel + 1
 
-                        TowerInfo[tower] = {
-                            name  = towerName,
-                            pos   = pos,
-                            level = newLevel
-                        }
+                        TowerInfo[tower] = {name = towerName, pos = pos, level = newLevel}
 
                         local towerKey = string.format("%s_%.1f_%.1f_%.1f", towerName, pos.X, pos.Y, pos.Z)
                         TowerLevels[towerKey] = newLevel
@@ -806,18 +814,18 @@ mt.__namecall = function(self,...)
                             newLevel = newLevel
                         })
 
-                        AddLog(string.format("[RECORD] upgrade %s %d -> %d",
+                        AddLog(string.format("upgrade %s %d -> %d",
                             towerName,
                             oldLevel,
                             newLevel
                         ), "upgrade")
                     else
                         AddAction({type="upgrade"})
-                        AddLog("[RECORD] upgrade (no position)","upgrade")
+                        AddLog("upgrade (no position)","upgrade")
                     end
                 else
                     AddAction({type="upgrade"})
-                    AddLog("[RECORD] upgrade (no tower instance)","upgrade")
+                    AddLog("upgrade (no tower instance)","upgrade")
                 end
                 UpdateStats()
             else
@@ -858,16 +866,16 @@ mt.__namecall = function(self,...)
                             towerName = towerName,
                             level = level
                         })
-                        AddLog(string.format("[RECORD] tower sold: %s [lvl %d]", towerName, level),"success")
+                        AddLog(string.format("tower sold: %s [lvl %d]", towerName, level),"success")
                     else
                         AddAction({type="sell", towerName = towerName, level = level})
-                        AddLog(string.format("[RECORD] sell (no position, %s [lvl %d])", towerName, level),"success")
+                        AddLog(string.format("sell (no position, %s [lvl %d])", towerName, level),"success")
                     end
 
                     TowerInfo[tower] = nil
                 else
                     AddAction({type="sell"})
-                    AddLog("[RECORD] sell (no tower instance)","success")
+                    AddLog("sell (no tower instance)","success")
                 end
                 UpdateStats()
             else
@@ -904,7 +912,7 @@ mt.__namecall = function(self,...)
                                 targetZ = targetPos.Z,
                                 cloneName = cloneName
                             })
-                            AddLog("[RECORD] hacker clone ("..cloneName..")","ability")
+                            AddLog("hacker clone ("..cloneName..")","ability")
                         else
                             AddLog("[SKIP] hacker ability data missing towerToClone/position","warn")
                         end
@@ -930,11 +938,11 @@ mt.__namecall = function(self,...)
                             z = pos.Z,
                             data = dataCopy
                         })
-                        AddLog("[RECORD] ability: "..abilityName.." ("..tName..")","ability")
+                        AddLog("ability: "..abilityName.." ("..tName..")","ability")
                     end
                 else
                     AddAction({type="ability_all",name=abilityName or "Ability"})
-                    AddLog("[RECORD] ability (no position)","ability")
+                    AddLog("ability (no position)","ability")
                 end
             else
                 AddLog("[SKIP] failed to activate ability","warn")
@@ -947,7 +955,7 @@ end
 
 setreadonly(mt,true)
 
--- // ПРОИГРЫВАНИЕ МАКРО
+-- ПРОИГРЫВАНИЕ МАКРО
 local function PlayMacro(name)
     if isRecording then
         ShowToast("Stop recording first")
@@ -988,7 +996,7 @@ local function PlayMacro(name)
                 local unit,x,y,z = act.unit,act.x,act.y,act.z
                 if type(unit)=="string" and type(x)=="number" then
                     if DoPlaceTower(unit,Vector3.new(x,y,z)) then
-                        AddLog("placed "..unit,"place")
+                        AddLog("success place "..unit,"place")
                         okCnt+=1
                     else failCnt+=1 end
                 end
@@ -1003,7 +1011,7 @@ local function PlayMacro(name)
                     local tower = FindTowerAtPosition(Vector3.new(x, y, z))
                     if tower then
                         DoUpgradeTower(tower, 1)
-                        AddLog(string.format("[SUCCESS] upgrade %s %d -> %d",
+                        AddLog(string.format("success upgrade %s %d -> %d",
                             towerName,
                             oldLevel,
                             newLevel
@@ -1027,7 +1035,7 @@ local function PlayMacro(name)
                     local tower = FindTowerAtPosition(Vector3.new(x,y,z))
                     if tower then
                         DoSellTower(tower)
-                        AddLog(string.format("[SUCCESS] sold %s [lvl %d]", towerName, level), "success")
+                        AddLog(string.format("success sold %s [lvl %d]", towerName, level), "success")
                         okCnt += 1
                     else
                         AddLog(string.format(
@@ -1076,7 +1084,7 @@ local function PlayMacro(name)
                             end)
 
                             if ok and IsActionSuccessful(res) then
-                                AddLog("[SUCCESS] hacker clone executed ("..cloneName..")","ability")
+                                AddLog("success hacker clone executed ("..cloneName..")","ability")
                                 okCnt += 1
                             else
                                 AddLog("[ERROR] hacker clone failed","error")
@@ -1114,7 +1122,7 @@ local function PlayMacro(name)
                             else finalData[k]=v end
                         end
                         if DoActivateAbility(tower,abilityName,finalData) then
-                            AddLog("[SUCCESS] ability used: "..abilityName,"ability")
+                            AddLog("success ability used: "..abilityName,"ability")
                             okCnt+=1
                         else failCnt+=1 end
                     else
@@ -1127,7 +1135,7 @@ local function PlayMacro(name)
         isPlaying = false
         UpdateStats()
         local text = string.format("✅ %d | ❌ %d", okCnt, failCnt)
-        AddLog("[SYSTEM] macro play finished - "..text,"system")
+        AddLog("macro play finished - "..text,"system")
         ShowToast("Macro finished")
     end)
 end
@@ -1162,8 +1170,7 @@ UserInputService.InputBegan:Connect(function(input,gp)
     end
 end)
 
--- // ДЕТАЛЬНЫЙ WEBHOOK ПО ЭКРАНУ НАГРАД
-
+-- ДЕТАЛЬНЫЙ WEBHOOK ПО ЭКРАНУ НАГРАД
 local ItemNames = {
     ["17447507910"] = "Timescale Ticket(s)",
     ["17438486690"] = "Range Flag(s)",
@@ -1343,7 +1350,6 @@ local function SendDetailedWebhook(match)
     end)
 end
 
-
 local lastGameState = GameState
 local gameEndProcessed = false
 
@@ -1366,7 +1372,7 @@ local function CheckGameEnd()
             UpdateStats()
             if WEBHOOK_URL ~= "" and (Stats.EarnedCoins > 0 or Stats.EarnedGems > 0) then
                 local description = string.format(
-                    "+%d coins (Total: %d)\\n+%d gems (Total: %d)",
+                    "+%d coins (Total: %d)\n+%d gems (Total: %d)",
                     Stats.EarnedCoins, Stats.Coins,
                     Stats.EarnedGems, Stats.Gems
                 )
@@ -1400,7 +1406,7 @@ player.OnTeleport:Connect(function()
     UpdateStats()
     if WEBHOOK_URL ~= "" and (Stats.EarnedCoins > 0 or Stats.EarnedGems > 0) and not gameEndProcessed then
         local description = string.format(
-            "+%d coins (Total: %d)\\n+%d gems (Total: %d)",
+            "+%d coins (Total: %d)\n+%d gems (Total: %d)",
             Stats.EarnedCoins, Stats.Coins,
             Stats.EarnedGems, Stats.Gems
         )
