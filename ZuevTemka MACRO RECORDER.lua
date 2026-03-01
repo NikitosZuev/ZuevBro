@@ -345,14 +345,24 @@ topBar.BorderSizePixel = 0
 Instance.new("UICorner", topBar).CornerRadius = UDim.new(0,14)
 
 local title = Instance.new("TextLabel", topBar)
-title.Size = UDim2.new(0.32, -10, 1, 0)
-title.Position = UDim2.new(0,10,0,0)
+title.Size = UDim2.new(0.6, -10, 0.6, 0)
+title.Position = UDim2.new(0,10,0,2)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamSemibold
-title.Text = "MACRO ZUEV HUB"
+title.Text = "MACRO RECORDER"
 title.TextColor3 = Color3.fromRGB(255,255,255)
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.TextSize = 18
+local subtitle = Instance.new("TextLabel", topBar)
+subtitle.Size = UDim2.new(0.6, -10, 0.4, 0)
+subtitle.Position = UDim2.new(0,10,0.6,0)
+subtitle.BackgroundTransparency = 1
+subtitle.Font = Enum.Font.Gotham
+subtitle.Text = "by zuev and temka"
+subtitle.TextColor3 = Color3.fromRGB(170,170,200)
+subtitle.TextXAlignment = Enum.TextXAlignment.Left
+subtitle.TextSize = 13
+
 
 local webhookBox = Instance.new("TextBox", topBar)
 webhookBox.Size = UDim2.new(0.5, -10, 0.6, 0)
